@@ -5,6 +5,9 @@ Same approach as the original tts_client.py (config.txt notes pygame was
 tried and abandoned on the old PC — build failure — so this project deliberately
 does NOT reintroduce a Python audio library). PowerShell + MediaPlayer ships
 with every Windows 10/11 install, so this needs nothing extra on the target PC.
+
+(Linux support was explored and built in an earlier pass of this project,
+then dropped by request -- Windows only, going forward.)
 """
 
 import os

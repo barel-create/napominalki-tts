@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Napominalki TTS</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Main screen: the live Telegram dashboard, embedded as-is. -->
+  <div id="main-screen">
+    <iframe id="dashboard-frame" title="Расписание" src="about:blank"></iframe>
+    <button id="update-btn" class="update-btn hidden" type="button"></button>
+  </div>
+
+  <!-- Gear toggle, top-right, always on top of the dashboard. -->
+  <button id="gear-btn" class="gear-btn" type="button" aria-label="Настройки">
+    <svg id="gear-icon" viewBox="0 0 100 100" class="icon gear-icon">
+      <circle cx="50" cy="50" r="18" fill="none" stroke="currentColor" stroke-width="8"/>
+      <circle cx="50" cy="50" r="7" fill="currentColor"/>
+      <g id="gear-teeth"></g>
+    </svg>
+  </button>
+
+  <!-- Settings panel, slides in from the right. -->
+  <aside id="settings-panel" class="settings-panel" aria-hidden="true">
+    <h2 class="settings-title">Настройки</h2>
+
+    <section class="setting-row">
+      <label for="field-url">Apps Script Web App URL</label>
+      <input id="field-url" type="text" autocomplete="off" spellcheck="false">
+      <button class="save-btn" data-save="url" type="button">Сохранить</button>
+    </section>
+
+    <section class="setting-row">
+      <label for="field-token">TTS токен</label>
+      <input id="field-token" type="text" autocomplete="off" spellcheck="false">
+      <button class="save-btn" data-save="token" type="button">Сохранить</button>
+    </section>
+
+    <section class="setting-row voice-row">
+      <label for="field-voice">Голос</label>
+      <div class="voice-controls">
+        <select id="field-voice"></select>
+        <button id="voice-test-btn" class="icon-btn" type="button" aria-label="Проверить голос">
+          <svg viewBox="0 0 100 100" class="icon speaker-icon">
+            <polygon points="15,38 35,38 55,20 55,80 35,62 15,62" fill="currentColor"/>
+            <path d="M66,32 A26,26 0 0 1 66,68" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+            <path d="M74,20 A42,42 0 0 1 74,80" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <section class="setting-row theme-row">
+      <label>Тема</label>
+      <div class="theme-controls">
+        <button id="theme-light-btn" class="icon-btn" type="button" aria-label="Светлая тема">
+          <svg viewBox="0 0 100 100" class="icon sun-icon">
+            <circle cx="50" cy="50" r="18" fill="currentColor"/>
+            <g stroke="currentColor" stroke-width="7" stroke-linecap="round">
+              <line x1="50" y1="8"  x2="50" y2="22"/>
+              <line x1="50" y1="78" x2="50" y2="92"/>
+              <line x1="8"  y1="50" x2="22" y2="50"/>
+              <line x1="78" y1="50" x2="92" y2="50"/>
+              <line x1="19" y1="19" x2="29" y2="29"/>
+              <line x1="71" y1="71" x2="81" y2="81"/>
+              <line x1="19" y1="81" x2="29" y2="71"/>
+              <line x1="71" y1="29" x2="81" y2="19"/>
+            </g>
+          </svg>
+        </button>
+        <button id="theme-dark-btn" class="icon-btn" type="button" aria-label="Тёмная тема">
+          <svg viewBox="0 0 100 100" class="icon moon-icon">
+            <mask id="moon-mask">
+              <rect x="0" y="0" width="100" height="100" fill="white"/>
+              <circle cx="62" cy="38" r="24" fill="black"/>
+            </mask>
+            <circle cx="50" cy="50" r="30" fill="currentColor" mask="url(#moon-mask)"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <section class="setting-row toggle-row">
+      <label for="field-borderless">Окно без рамки</label>
+      <button id="field-borderless" class="toggle-switch" type="button" role="switch" aria-checked="false">
+        <span class="toggle-knob"></span>
+      </button>
+    </section>
+
+    <section class="setting-row toggle-row">
+      <label for="field-autoupdate">Автообновление</label>
+      <button id="field-autoupdate" class="toggle-switch" type="button" role="switch" aria-checked="false">
+        <span class="toggle-knob"></span>
+      </button>
+    </section>
+
+    <p id="settings-status" class="settings-status"></p>
+  </aside>
+
+  <script src="app.js"></script>
+</body>
+</html>

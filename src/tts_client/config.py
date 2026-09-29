@@ -25,9 +25,25 @@ DEFAULTS = {
     "stale_sec": 300,
     "volume_boost": 2.0,
     "autostart": False,
+    # GUI-only settings (Sep 2026 rewrite). dashboard_url is not exposed in the
+    # Settings panel (only web_app_url / tts_token are, per spec) -- it's the
+    # separate GitHub Pages dashboard, kept here so it's still one place to
+    # change if that URL is ever retired/moved.
+    "theme": "light",
+    "borderless": False,
+    "autoupdate": False,
+    "dashboard_url": "https://barel-create.github.io/napominalki-dashboard/",
 }
 
 REQUIRED_KEYS = ("web_app_url", "tts_token")
+
+# A handful of Russian neural voices edge-tts offers (ru-RU-DmitryNeural is
+# the LOCKED default from config.txt; the others are included so the
+# Settings dropdown isn't a dropdown of one). (value, human label) pairs.
+VOICE_OPTIONS = [
+    ("ru-RU-DmitryNeural", "Дмитрий (муж.)"),
+    ("ru-RU-SvetlanaNeural", "Светлана (жен.)"),
+]
 
 
 def app_base_dir():
@@ -48,7 +64,15 @@ def config_path():
     return os.path.join(app_base_dir(), "config.json")
 
 
-def load_config():
+def _read_raw():
+    """
+    Reads config.json merged over DEFAULTS, with NO check for REQUIRED_KEYS
+    -- returns None only if the file doesn't exist yet or is corrupt. This
+    is the one every "give me the current saved state" caller should use
+    (get_config_for_gui, update_setting); load_config() below layers the
+    REQUIRED_KEYS gate on top for the code paths that specifically need to
+    know "is this a fully USABLE config" (the console wizard, the poll loop).
+    """
     path = config_path()
     if not os.path.exists(path):
         return None
@@ -60,9 +84,16 @@ def load_config():
         return None
     merged = dict(DEFAULTS)
     merged.update(data)
+    return merged
+
+
+def load_config():
+    merged = _read_raw()
+    if merged is None:
+        return None
     missing = [k for k in REQUIRED_KEYS if not merged.get(k)]
     if missing:
-        print(f"[config] {path} is missing: {', '.join(missing)}")
+        print(f"[config] {config_path()} is missing: {', '.join(missing)}")
         return None
     return merged
 
@@ -110,3 +141,42 @@ def get_or_setup_config():
     if cfg is not None:
         return cfg
     return run_setup_wizard()
+
+
+def get_config_for_gui():
+    """
+    GUI equivalent of get_or_setup_config() -- never blocks on input() (a
+    windowed/noconsole build has no console to prompt in), and never drops
+    partial progress (e.g. a theme choice saved before web_app_url/tts_token
+    are filled in) the way going through load_config() would. If no config
+    file exists yet at all, writes and returns the defaults; gui.py checks
+    is_configured() itself and opens the Settings panel on first run so the
+    person fills in web_app_url / tts_token there instead of a console
+    wizard.
+    """
+    cfg = _read_raw()
+    if cfg is not None:
+        return cfg
+    cfg = dict(DEFAULTS)
+    save_config(cfg)
+    return cfg
+
+
+def update_setting(key, value):
+    """
+    Reads the current saved state (raw -- NOT load_config(), which would
+    return None and silently discard other already-saved fields whenever
+    web_app_url/tts_token aren't both filled in yet), sets one key, saves.
+    Used by the Settings panel's Save buttons / toggles -- each field saves
+    independently rather than requiring a single "save everything" action.
+    """
+    cfg = _read_raw()
+    if cfg is None:
+        cfg = dict(DEFAULTS)
+    cfg[key] = value
+    save_config(cfg)
+    return cfg
+
+
+def is_configured(cfg):
+    return all(cfg.get(k) for k in REQUIRED_KEYS)

@@ -1,0 +1,255 @@
+/* ============================================================
+   THEME TOKENS
+   ============================================================ */
+:root {
+  --bg: #f4f4f6;
+  --panel-bg: #ffffff;
+  --text: #1c1c1e;
+  --text-dim: #6b6b70;
+  --border: #dcdce0;
+  --accent: #3a7afe;
+  --accent-text: #ffffff;
+  --icon-color: #1c1c1e;   /* gear/sun/moon/speaker stand out against bg */
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="dark"] {
+  --bg: #16161a;
+  --panel-bg: #202024;
+  --text: #f2f2f4;
+  --text-dim: #9b9ba1;
+  --border: #34343a;
+  --accent: #5b93ff;
+  --accent-text: #0d0d0f;
+  --icon-color: #ffffff;   /* white so they stand out on dark, per spec */
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================================
+   BASE / SCALABLE LAYOUT
+   All interactive elements size with clamp() so they never get
+   too large on a huge window or too small on a tiny one.
+   ============================================================ */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  overflow: hidden;
+}
+
+#main-screen {
+  position: fixed;
+  inset: 0;
+}
+
+#dashboard-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #fff;
+}
+
+/* ============================================================
+   GEAR BUTTON (top-right, always visible)
+   ============================================================ */
+.gear-btn {
+  position: fixed;
+  top: clamp(10px, 2vw, 24px);
+  right: clamp(10px, 2vw, 24px);
+  width: clamp(36px, 5vw, 56px);
+  height: clamp(36px, 5vw, 56px);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow);
+  color: var(--icon-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.icon {
+  width: 60%;
+  height: 60%;
+}
+
+.gear-icon {
+  transition: transform 0.5s ease;
+  transform: rotate(0deg);
+}
+
+.gear-icon.open {
+  transform: rotate(180deg);
+}
+
+/* ============================================================
+   SETTINGS PANEL
+   ============================================================ */
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: clamp(280px, 30vw, 420px);
+  max-width: 90vw;
+  background: var(--panel-bg);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: clamp(16px, 3vw, 32px);
+  padding-top: clamp(60px, 8vw, 88px);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  z-index: 900;
+  overflow-y: auto;
+}
+
+.settings-panel.open {
+  transform: translateX(0);
+}
+
+.settings-title {
+  font-size: clamp(16px, 2vw, 22px);
+  margin: 0 0 clamp(16px, 3vw, 28px);
+}
+
+.setting-row {
+  margin-bottom: clamp(14px, 2.5vw, 24px);
+}
+
+.setting-row label {
+  display: block;
+  font-size: clamp(12px, 1.3vw, 14px);
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.setting-row input,
+.setting-row select {
+  width: 100%;
+  font-size: clamp(13px, 1.4vw, 15px);
+  padding: clamp(6px, 1vw, 10px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.save-btn {
+  margin-top: 8px;
+  font-size: clamp(12px, 1.3vw, 14px);
+  padding: clamp(6px, 1vw, 10px) clamp(12px, 2vw, 18px);
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+
+.voice-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.voice-controls select {
+  flex: 1;
+}
+
+.icon-btn {
+  flex: none;
+  width: clamp(32px, 4vw, 44px);
+  height: clamp(32px, 4vw, 44px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--icon-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-controls {
+  display: flex;
+  justify-content: space-between;
+  width: clamp(90px, 10vw, 120px);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle-row label {
+  margin-bottom: 0;
+}
+
+.toggle-switch {
+  position: relative;
+  width: clamp(40px, 5vw, 52px);
+  height: clamp(22px, 2.8vw, 28px);
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--border);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.toggle-switch[aria-checked="true"] {
+  background: var(--accent);
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(100% - 4px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+}
+
+.toggle-switch[aria-checked="true"] .toggle-knob {
+  transform: translateX(calc(clamp(40px, 5vw, 52px) - 100% - 4px));
+}
+
+.settings-status {
+  font-size: clamp(11px, 1.2vw, 13px);
+  color: var(--text-dim);
+  min-height: 1.2em;
+}
+
+/* ============================================================
+   UPDATE BUTTON (below the dashboard, manual-update mode only)
+   ============================================================ */
+.update-btn {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(10px, 2vw, 24px);
+  transform: translateX(-50%);
+  font-size: clamp(12px, 1.4vw, 15px);
+  padding: clamp(8px, 1.2vw, 12px) clamp(16px, 2.4vw, 24px);
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  z-index: 950;
+}
+
+.hidden {
+  display: none !important;
+}
