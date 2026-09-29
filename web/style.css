@@ -61,7 +61,7 @@ html, body {
 .gear-btn {
   position: fixed;
   top: clamp(10px, 2vw, 24px);
-  right: clamp(10px, 2vw, 24px);
+  left: clamp(10px, 2vw, 24px);
   width: clamp(36px, 5vw, 56px);
   height: clamp(36px, 5vw, 56px);
   padding: 0;
@@ -97,19 +97,21 @@ html, body {
 .settings-panel {
   position: fixed;
   top: 0;
-  right: 0;
+  left: 0;
   height: 100%;
   width: clamp(280px, 30vw, 420px);
   max-width: 90vw;
   background: var(--panel-bg);
-  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   box-shadow: var(--shadow);
   padding: clamp(16px, 3vw, 32px);
   padding-top: clamp(60px, 8vw, 88px);
-  transform: translateX(100%);
+  transform: translateX(-100%);
   transition: transform 0.3s ease;
   z-index: 900;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-panel.open {
@@ -143,10 +145,11 @@ html, body {
   color: var(--text);
 }
 
-.save-btn {
-  margin-top: 8px;
-  font-size: clamp(12px, 1.3vw, 14px);
-  padding: clamp(6px, 1vw, 10px) clamp(12px, 2vw, 18px);
+.save-all-btn {
+  margin-top: auto; /* pushes to the bottom of the flex panel, above the status line */
+  width: 100%;
+  font-size: clamp(13px, 1.5vw, 16px);
+  padding: clamp(10px, 1.6vw, 14px);
   border: none;
   border-radius: 8px;
   background: var(--accent);
@@ -196,14 +199,23 @@ html, body {
 }
 
 .toggle-switch {
+  /* Bug fix: the knob used to size itself off the TRACK's width (100% inside
+     .toggle-knob resolved against the parent's full ~50px width), giving a
+     ~46px circle inside a ~26px-tall track -- massive overflow, which is
+     exactly the "two parts / weirdly rendered / too-big circle" symptom.
+     Fix: size the knob off the track's HEIGHT via a local custom property,
+     so it's always a small circle that actually fits inside the track. */
+  --track-w: clamp(40px, 5vw, 52px);
+  --track-h: clamp(22px, 2.8vw, 28px);
   position: relative;
-  width: clamp(40px, 5vw, 52px);
-  height: clamp(22px, 2.8vw, 28px);
+  width: var(--track-w);
+  height: var(--track-h);
+  flex: none;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--border);
   cursor: pointer;
-  padding: 2px;
+  padding: 0;
 }
 
 .toggle-switch[aria-checked="true"] {
@@ -214,7 +226,7 @@ html, body {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: calc(100% - 4px);
+  height: calc(var(--track-h) - 4px);
   aspect-ratio: 1;
   border-radius: 50%;
   background: #fff;
@@ -222,7 +234,9 @@ html, body {
 }
 
 .toggle-switch[aria-checked="true"] .toggle-knob {
-  transform: translateX(calc(clamp(40px, 5vw, 52px) - 100% - 4px));
+  /* knob width == track height (aspect-ratio: 1 off the height above), so
+     sliding it flush to the right edge is simply track_w - track_h. */
+  transform: translateX(calc(var(--track-w) - var(--track-h)));
 }
 
 .settings-status {

@@ -14,11 +14,15 @@
     <button id="update-btn" class="update-btn hidden" type="button"></button>
   </div>
 
-  <!-- Gear toggle, top-right, always on top of the dashboard. -->
+  <!-- Gear toggle, top-left, always on top of the dashboard. -->
   <button id="gear-btn" class="gear-btn" type="button" aria-label="Настройки">
     <svg id="gear-icon" viewBox="0 0 100 100" class="icon gear-icon">
-      <circle cx="50" cy="50" r="18" fill="none" stroke="currentColor" stroke-width="8"/>
-      <circle cx="50" cy="50" r="7" fill="currentColor"/>
+      <!-- Ring at r=20/stroke=10 (outer edge ~25, inner edge ~15). Teeth
+           (drawn in app.js) start well inside that band and only poke a
+           short way past it, so they read as part of the gear, not
+           separate rays floating off a circle (which looked like a sun). -->
+      <circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="10"/>
+      <circle cx="50" cy="50" r="6" fill="currentColor"/>
       <g id="gear-teeth"></g>
     </svg>
   </button>
@@ -30,13 +34,11 @@
     <section class="setting-row">
       <label for="field-url">Apps Script Web App URL</label>
       <input id="field-url" type="text" autocomplete="off" spellcheck="false">
-      <button class="save-btn" data-save="url" type="button">Сохранить</button>
     </section>
 
     <section class="setting-row">
       <label for="field-token">TTS токен</label>
       <input id="field-token" type="text" autocomplete="off" spellcheck="false">
-      <button class="save-btn" data-save="token" type="button">Сохранить</button>
     </section>
 
     <section class="setting-row voice-row">
@@ -97,6 +99,7 @@
       </button>
     </section>
 
+    <button id="save-all-btn" class="save-all-btn" type="button">Сохранить всё</button>
     <p id="settings-status" class="settings-status"></p>
   </aside>
 

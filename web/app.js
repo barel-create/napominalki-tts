@@ -14,23 +14,33 @@ const settingsPanel = document.getElementById("settings-panel");
 const statusEl = document.getElementById("settings-status");
 const dashboardFrame = document.getElementById("dashboard-frame");
 const updateBtn = document.getElementById("update-btn");
+const saveAllBtn = document.getElementById("save-all-btn");
 
 let settingsOpen = false;
+let currentDashboardUrl = ""; // base URL from config, without the ?theme= param
 
 // --------------------------------------------------------------
 // Gear teeth -- drawn programmatically so index.html doesn't need
-// 8 hand-positioned <rect> tags.
+// 6 hand-positioned <rect> tags.
+//
+// The ring in index.html is r=20/stroke-width=10, so it visually spans
+// radius 15 (inner edge) to 25 (outer edge) from center (50,50). Each
+// tooth's inner edge sits at radius 17 -- inside that band, guaranteeing
+// overlap with no gap -- and only extends out to radius 30, a short
+// protrusion past the ring rather than long floating rays (which is what
+// made the first version read as a sun instead of a gear). Thicker
+// (width 14) and only 6 of them so adjacent teeth don't crowd each other.
 // --------------------------------------------------------------
 function buildGearTeeth() {
   const g = document.getElementById("gear-teeth");
-  const toothCount = 8;
+  const toothCount = 6;
   for (let i = 0; i < toothCount; i++) {
     const angle = (360 / toothCount) * i;
     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.setAttribute("x", "46");
-    rect.setAttribute("y", "4");
-    rect.setAttribute("width", "8");
-    rect.setAttribute("height", "16");
+    rect.setAttribute("x", "43");
+    rect.setAttribute("y", "20");
+    rect.setAttribute("width", "14");
+    rect.setAttribute("height", "13");
     rect.setAttribute("fill", "currentColor");
     rect.setAttribute("transform", `rotate(${angle} 50 50)`);
     g.appendChild(rect);
@@ -99,25 +109,36 @@ async function loadSettings() {
   document.getElementById("field-autoupdate").setAttribute(
     "aria-checked", cfg.autoupdate ? "true" : "false"
   );
+
+  currentDashboardUrl = cfg.dashboard_url;
+  return cfg;
 }
 
 // --------------------------------------------------------------
-// Save handlers (URL / token)
+// One consolidated Save button -- saves URL + token together (per
+// request: "instead of many save buttons, one save button that saves
+// ALL the settings"). Voice/theme/toggles are separate control types
+// (dropdown, icon buttons, switches) that apply as soon as you interact
+// with them, same as most apps' instant-effect controls -- only the two
+// text fields batch under this one button.
 // --------------------------------------------------------------
-document.querySelectorAll(".save-btn").forEach((btn) => {
-  btn.addEventListener("click", async () => {
-    const which = btn.dataset.save;
-    const field = document.getElementById(which === "url" ? "field-url" : "field-token");
-    const value = field.value.trim();
-    if (!value) return;
-    await window.pywebview.api.save_setting(which, value);
-    showStatus("Сохранено");
-  });
+saveAllBtn.addEventListener("click", async () => {
+  const url = document.getElementById("field-url").value.trim();
+  const token = document.getElementById("field-token").value.trim();
+  await window.pywebview.api.save_setting("url", url);
+  await window.pywebview.api.save_setting("token", token);
+  showStatus("Сохранено");
 });
 
 // --------------------------------------------------------------
-// Voice test
+// Voice: picking a different option saves it immediately -- this is
+// what real lesson announcements actually use, not just the test button.
 // --------------------------------------------------------------
+document.getElementById("field-voice").addEventListener("change", async (e) => {
+  await window.pywebview.api.save_setting("voice", e.target.value);
+  showStatus("Голос сохранён");
+});
+
 document.getElementById("voice-test-btn").addEventListener("click", async () => {
   const voice = document.getElementById("field-voice").value;
   showStatus("Проверка голоса...");
@@ -128,11 +149,15 @@ document.getElementById("voice-test-btn").addEventListener("click", async () => 
 // --------------------------------------------------------------
 // Theme buttons -- icon color itself flips via the [data-theme] CSS
 // variables (--icon-color), so this only needs to set the attribute
-// and persist it.
+// and persist it. Also re-points the dashboard iframe with a ?theme=
+// param so the embedded page can match (see loadDashboard/reloadDashboard
+// below) -- the dashboard itself needs a small matching change on its
+// side to actually read that param; flagged separately.
 // --------------------------------------------------------------
 async function setTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   await window.pywebview.api.save_setting("theme", theme);
+  reloadDashboard(theme);
 }
 document.getElementById("theme-light-btn").addEventListener("click", () => setTheme("light"));
 document.getElementById("theme-dark-btn").addEventListener("click", () => setTheme("dark"));
@@ -168,18 +193,33 @@ wireToggle("field-autoupdate", async (checked) => {
 // napominalki-dashboard repo), so reloading the iframe is what makes
 // it "live" here -- roughly matches how often the bot's own cache
 // updates anyway, so there's no point polling faster.
+//
+// The ?theme= query param is this app's half of theme syncing with the
+// embedded page: napominalki-dashboard is a DIFFERENT origin (GitHub
+// Pages), so cross-origin rules block reaching into its DOM/CSS directly
+// -- a URL param (or postMessage) is the only channel that reaches it.
+// This app always sends it; the dashboard repo needs a small matching
+// change to read `?theme=` and apply a dark stylesheet when present
+// (today it only follows Telegram's own theme variables, which aren't
+// set at all when opened in this iframe instead of inside Telegram).
 // --------------------------------------------------------------
+function reloadDashboard(theme) {
+  if (!currentDashboardUrl) return;
+  const sep = currentDashboardUrl.includes("?") ? "&" : "?";
+  const url = currentDashboardUrl + sep + "theme=" + encodeURIComponent(theme);
+  dashboardFrame.src = "about:blank";
+  dashboardFrame.src = url;
+}
+
 async function loadDashboard() {
-  const cfg = await window.pywebview.api.get_settings();
-  dashboardFrame.src = cfg.dashboard_url;
+  const theme = document.documentElement.getAttribute("data-theme") || "light";
+  reloadDashboard(theme);
 }
 
 function startDashboardRefresh() {
   setInterval(() => {
-    // Re-set src (not .reload()) so a same-URL frame still forces a refetch.
-    const url = dashboardFrame.src;
-    dashboardFrame.src = "about:blank";
-    dashboardFrame.src = url;
+    const theme = document.documentElement.getAttribute("data-theme") || "light";
+    reloadDashboard(theme);
   }, DASHBOARD_REFRESH_MS);
 }
 
@@ -213,11 +253,26 @@ updateBtn.addEventListener("click", async () => {
 // --------------------------------------------------------------
 // Startup
 // --------------------------------------------------------------
-(async function init() {
+// pywebview injects window.pywebview.api asynchronously, AFTER this page's
+// own scripts have already started running -- calling the bridge before
+// it's ready (which the previous version did, unconditionally, at the
+// bottom of this file) silently fails every api.* call. That was the
+// actual cause of both "voices list is empty" and "dashboard doesn't
+// load": loadSettings()/loadDashboard() were running before the bridge
+// existed. Fix: wait for the 'pywebviewready' event pywebview fires once
+// it's actually available, falling back to running immediately in the
+// rare case that event already fired before this listener was attached.
+async function init() {
   buildGearTeeth();
   await loadSettings();
   await loadDashboard();
   startDashboardRefresh();
   checkForUpdate();
   setInterval(checkForUpdate, UPDATE_CHECK_MS);
-})();
+}
+
+if (window.pywebview && window.pywebview.api) {
+  init();
+} else {
+  window.addEventListener("pywebviewready", init);
+}
