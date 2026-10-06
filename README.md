@@ -100,7 +100,7 @@ src/tts_client/
   queue_client.py          polls the Apps Script TTS queue
   synth.py                 edge-tts synthesis + ffmpeg volume boost
   player.py                chime + voice playback (PowerShell MediaPlayer)
-  autostart.py             installs/removes the Windows "run at login" entry
+  autostart.py             registers the exe in HKCU\...\Run so it starts at Windows login
   version.py                APP_VERSION + GitHub repo info, for the updater
   updater.py                checks GitHub Releases, downloads + swaps in updates
   gui.py                    pywebview window setup, background poll thread
@@ -122,8 +122,13 @@ build.spec                  PyInstaller build config (console=False, bundles web
   mechanism now — a new PC downloads the current release instead of
   syncing a live-edited folder.
 - **No more separate `tts_runner.bat`.** The poll loop itself never exits on
-  a normal error (it logs and retries with backoff); Windows autostart is
-  installed by the app on first run instead of a manually-placed shortcut.
+  a normal error (it logs and retries with backoff). Starting at Windows
+  login is handled by the app itself: every launch registers the exe under
+  the per-user Run registry key (no admin needed, always on, no toggle).
+  To turn it off: Task Manager -> Startup apps -> NapominalkiTTS -> Disable
+  (Windows remembers that choice; the app won't override it). Note it only
+  fires after someone logs in, so the PC needs auto-login to be hands-off,
+  and it does not restart the app if it crashes mid-session.
 - **Real window, not a console.** Settings, theme, the dashboard — all in
   one resizable window instead of a terminal + a separate browser tab.
 - **Self-updating.** Checks GitHub for a newer release; either applies it

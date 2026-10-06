@@ -10,6 +10,7 @@ Kept as a thin wrapper around config.py / synth.py / player.py / updater.py
 import threading
 
 from tts_client import config, synth, player, updater
+from tts_client.version import APP_VERSION
 
 VOICE_TEST_PHRASE = "Проверка голоса"
 
@@ -44,6 +45,7 @@ class Api:
             "borderless": bool(cfg.get("borderless", False)),
             "autoupdate": bool(cfg.get("autoupdate", False)),
             "dashboard_url": cfg.get("dashboard_url", config.DEFAULTS["dashboard_url"]),
+            "version": APP_VERSION,
         }
 
     def save_setting(self, key, value):
@@ -95,8 +97,8 @@ class Api:
     def check_for_update(self):
         return updater.check_latest()
 
-    def apply_update(self, download_url):
-        ok = updater.apply_update(download_url)
+    def apply_update(self, download_url, expected_size=None):
+        ok = updater.apply_update(download_url, expected_size=expected_size)
         if ok:
             # Helper .bat is already waiting on this PID; exiting now is
             # what lets it proceed (see updater.apply_update's docstring).

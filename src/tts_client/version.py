@@ -7,7 +7,7 @@ offered to users via the update button / autoupdate. updater.py compares
 this against the latest GitHub Release's tag_name.
 """
 
-APP_VERSION = "1.1.0"  # first GUI release (console-only build was the 1.0.x line)
+APP_VERSION = "1.1.2"  # vs 1.1.1: version shown at bottom of Settings; app now self-registers to start at Windows login
 
 GITHUB_OWNER = "barel-create"
 GITHUB_REPO = "napominalki-tts"

@@ -245,6 +245,15 @@ html, body {
   min-height: 1.2em;
 }
 
+/* Version label -- last thing in the panel, always visible at the bottom. */
+.app-version {
+  margin: 0;
+  padding-top: clamp(4px, 0.8vw, 8px);
+  text-align: center;
+  font-size: clamp(11px, 1.2vw, 13px);
+  color: var(--text-dim);
+}
+
 /* ============================================================
    UPDATE BUTTON (below the dashboard, manual-update mode only)
    ============================================================ */

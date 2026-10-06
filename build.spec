@@ -5,9 +5,13 @@
 # "download and run" work with nothing else to install on the target PC.
 #
 # console=False (Sep 2026 GUI rewrite): no more black terminal window --
-# the app is a pywebview window now (see gui.py). Anything printed via
-# print()/traceback still happens, it just has nowhere visible to go in a
-# normal double-click launch; that's an accepted trade-off of "no console".
+# the app is a pywebview window now (see gui.py). IMPORTANT: with no console
+# attached, sys.stdout/sys.stderr are None on Windows, and a bare print()
+# call raises AttributeError -- gui.py's _setup_safe_output() redirects
+# stdout/stderr to a log.txt next to the exe before anything else runs, so
+# every print()/traceback.print_exc() call site keeps working unchanged.
+# (This was the actual root cause of the app going silent after its first
+# lesson announcement -- see gui.py for the full writeup.)
 
 import os
 
@@ -42,6 +46,7 @@ a = Analysis(
         "webview.platforms.edgechromium",
         "webview.platforms.winforms",
         "clr_loader",
+        "winreg",  # autostart.py imports it lazily inside a function; list it explicitly so it can't be missed
     ],
     hookspath=[],
     runtime_hooks=[],

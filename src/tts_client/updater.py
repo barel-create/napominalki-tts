@@ -5,7 +5,10 @@ and relaunch on it.
 A running .exe can't overwrite its own file on Windows (the OS keeps it
 locked), so the swap happens via a tiny detached helper .bat that:
   1. waits a moment for this process to fully exit,
-  2. deletes the old exe and renames the freshly-downloaded one into its place,
+  2. moves the freshly-downloaded exe directly over the old one (a single
+     "move /Y", not a separate delete-then-move -- if the move step fails
+     for any reason, the old, still-working exe is untouched instead of
+     having already been deleted with nothing to replace it),
   3. relaunches it,
   4. deletes itself.
 This means an update is NOT invisible -- the window closes and reopens a
@@ -58,28 +61,46 @@ def check_latest():
         current = _parse_version(APP_VERSION)
 
         asset_url = None
+        asset_size = None
         for asset in data.get("assets", []):
             if asset.get("name") == ASSET_NAME:
                 asset_url = asset.get("browser_download_url")
+                asset_size = asset.get("size")
                 break
 
         return {
             "available": latest > current and asset_url is not None,
             "version": tag.lstrip("vV"),
             "download_url": asset_url,
+            "size": asset_size,
         }
     except Exception as e:
         print(f"[updater] check failed: {e}")
         return {"available": False, "error": str(e)}
 
 
-def _download(url, dest_path):
+def _download(url, dest_path, expected_size=None):
     req = urllib.request.Request(url, headers={"User-Agent": "NapominalkiTTS"})
     with urllib.request.urlopen(req, timeout=60) as resp, open(dest_path, "wb") as f:
         f.write(resp.read())
 
+    # Integrity check: without this, a connection drop mid-download would
+    # silently leave a truncated/corrupt .exe that still gets swapped in
+    # below, bricking the app with no fallback. GitHub's release-asset
+    # metadata gives us the exact expected byte count for free, so a
+    # simple length check catches it before anything touches the exe
+    # that's actually working right now.
+    if expected_size is not None:
+        actual_size = os.path.getsize(dest_path)
+        if actual_size != expected_size:
+            os.remove(dest_path)
+            raise ValueError(
+                f"downloaded {actual_size} bytes, expected {expected_size} "
+                "-- download is truncated or corrupted"
+            )
 
-def apply_update(download_url):
+
+def apply_update(download_url, expected_size=None):
     """
     Downloads the new exe, writes + launches the swap-and-relaunch helper,
     then this process should exit immediately after calling this (see
@@ -96,7 +117,7 @@ def apply_update(download_url):
     new_exe = os.path.join(exe_dir, "NapominalkiTTS.new.exe")
 
     try:
-        _download(download_url, new_exe)
+        _download(download_url, new_exe, expected_size=expected_size)
     except Exception as e:
         print(f"[updater] download failed: {e}")
         if os.path.exists(new_exe):
@@ -104,6 +125,14 @@ def apply_update(download_url):
         return False
 
     bat_path = os.path.join(tempfile.gettempdir(), "napominalki_update.bat")
+    # Deliberately NOT "del current_exe" followed by a separate "move" --
+    # that order has a real failure mode: if move then fails for any
+    # reason (antivirus briefly locking the fresh download, a permissions
+    # hiccup, disk hiccup), the old exe is already gone and the app is
+    # left with NOTHING to launch, un-recoverably, until a human notices.
+    # "move /Y" alone overwrites the destination directly in one step, so
+    # if it fails the untouched old exe is still sitting there and "start"
+    # below just relaunches the still-working previous version instead.
     bat_contents = f"""@echo off
 :wait
 tasklist /FI "PID eq {os.getpid()}" 2>NUL | find "{os.getpid()}" >NUL
@@ -111,7 +140,6 @@ if not errorlevel 1 (
     timeout /t 1 /nobreak >NUL
     goto wait
 )
-del "{current_exe}"
 move /Y "{new_exe}" "{current_exe}"
 start "" "{current_exe}"
 del "%~f0"

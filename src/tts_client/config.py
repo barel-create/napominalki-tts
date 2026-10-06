@@ -24,7 +24,7 @@ DEFAULTS = {
     "poll_sec": 5,
     "stale_sec": 300,
     "volume_boost": 2.0,
-    "autostart": False,
+    "autostart": False,      # LEGACY (console build only). The GUI build ignores this and always self-registers -- see gui.py / autostart.py.
     # GUI-only settings (Sep 2026 rewrite). dashboard_url is not exposed in the
     # Settings panel (only web_app_url / tts_token are, per spec) -- it's the
     # separate GitHub Pages dashboard, kept here so it's still one place to

@@ -110,6 +110,8 @@ async function loadSettings() {
     "aria-checked", cfg.autoupdate ? "true" : "false"
   );
 
+  document.getElementById("app-version").textContent = "v" + (cfg.version || "?");
+
   currentDashboardUrl = cfg.dashboard_url;
   return cfg;
 }
@@ -235,7 +237,7 @@ async function checkForUpdate() {
     return;
   }
   if (cfg.autoupdate) {
-    await window.pywebview.api.apply_update(info.download_url);
+    await window.pywebview.api.apply_update(info.download_url, info.size);
     return; // app is about to close + relaunch
   }
   updateBtn.textContent = `Обновить до v${info.version}`;
@@ -246,7 +248,7 @@ updateBtn.addEventListener("click", async () => {
   const info = await window.pywebview.api.check_for_update();
   if (info && info.available) {
     updateBtn.textContent = "Обновление...";
-    await window.pywebview.api.apply_update(info.download_url);
+    await window.pywebview.api.apply_update(info.download_url, info.size);
   }
 });
 
