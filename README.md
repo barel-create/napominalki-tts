@@ -145,3 +145,7 @@ tested side by side before anything gets decommissioned.
 
 * `log.txt` is written next to the exe (or in `%LOCALAPPDATA%\NapominalkiTTS\` if that folder is not writable; the first lines of the log say which). It records every start, every poll that returned something, every step of every announcement, and all errors. It is trimmed to 1 MB on each start (the old one is kept as `log.txt.old`).
 * The Settings panel shows a live status line above the version: last poll time/result, last announcement, last error.
+
+## Queue protocol (1.1.4)
+
+The app asks Apps Script for announcements with `?action=ttspeek` (read, delete nothing), speaks them, then confirms with `?action=ttsack&ids=...`. A timed-out or lost reply loses nothing: the item stays queued and is retried. If the deployed Code.gs is older (no `ttspeek`), the app automatically falls back to the old destructive `?action=tts` and re-checks every 5 minutes. Run only ONE copy of the app: with peek/ack, two copies would both speak every announcement.

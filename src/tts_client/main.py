@@ -22,6 +22,7 @@ from tts_client.logsetup import log
 
 
 def speak_item(text, cfg, base_dir):
+    """Returns True if the announcement was actually played."""
     # Everything here is logged step by step (1.1.3). Before, the first line was
     # a bare print() OUTSIDE the try -- any failure there lost the item silently.
     log(f"[speak] start: {text!r}")
@@ -45,31 +46,76 @@ def speak_item(text, cfg, base_dir):
         if ok:
             status.update(last_spoken=text, last_spoken_at=time.time())
             log(f"[speak] done in {time.time() - t0:.1f}s")
-        else:
-            raise RuntimeError("voice playback failed (see [player] line above)")
+            return True
+        raise RuntimeError("voice playback failed (see [player] line above)")
     except Exception as e:
         log("[speak] FAILED:\n" + traceback.format_exc())
         status.update(last_error=f"{type(e).__name__}: {e}", last_error_at=time.time())
+        return False
     finally:
         synth.cleanup(raw_path, boosted_path)
 
 
+# --- state that lives for the whole run (poll_once is called every few seconds) ---
+MAX_SPEAK_ATTEMPTS = 3
+_spoken = {}        # item id -> time it was spoken; stops a re-delivered item (lost ack) being spoken twice
+_attempts = {}      # item id -> failed speak attempts so far
+_pending_ack = set()  # ids handled locally but not yet confirmed to the server
+
+
+def _remember_spoken(item_id):
+    _spoken[item_id] = time.time()
+    if len(_spoken) > 300:
+        for k, _ in sorted(_spoken.items(), key=lambda kv: kv[1])[:100]:
+            _spoken.pop(k, None)
+
+
 def poll_once(cfg, base_dir):
     """Returns how many items the server handed back (0 is normal)."""
-    items = queue_client.fetch_items(cfg["web_app_url"], cfg["tts_token"])
+    url, token = cfg["web_app_url"], cfg["tts_token"]
+    items, mode = queue_client.fetch(url, token)
     if items:
-        log(f"[poll] server returned {len(items)} item(s); skew vs server={queue_client.last_info.get('skew')}s")
+        log(f"[poll] server returned {len(items)} item(s) ({mode}); skew vs server={queue_client.last_info.get('skew')}s")
+
     for item in items:
-        text = (item or {}).get("text", "").strip()
-        ts = (item or {}).get("ts")
+        item = item or {}
+        text = (item.get("text") or "").strip()
+        ts = item.get("ts")
+        item_id = item.get("id")
+
+        if item_id and item_id in _spoken:
+            log(f"[poll] item {item_id[:8]} was already spoken (earlier ack not confirmed) -> only re-acking")
+            _pending_ack.add(item_id)
+            continue
         if not text:
             log(f"[poll] skipping item with empty text: {item!r}")
+            if item_id:
+                _pending_ack.add(item_id)
             continue
         if ts is not None and queue_client.is_stale(ts, cfg["stale_sec"]):
             age = int(queue_client.age_sec(ts))
             log(f"[poll] SKIPPED as stale ({age}s old > {cfg['stale_sec']}s): {text!r}")
+            if item_id:
+                _pending_ack.add(item_id)
             continue
-        speak_item(text, cfg, base_dir)
+
+        if speak_item(text, cfg, base_dir):
+            if item_id:
+                _remember_spoken(item_id)
+                _pending_ack.add(item_id)
+        elif item_id:
+            _attempts[item_id] = _attempts.get(item_id, 0) + 1
+            if _attempts[item_id] >= MAX_SPEAK_ATTEMPTS:
+                log(f"[poll] giving up on item {item_id[:8]} after {_attempts[item_id]} failed attempts: {text!r}")
+                _pending_ack.add(item_id)
+            else:
+                log(f"[poll] item {item_id[:8]} not spoken (attempt {_attempts[item_id]}/{MAX_SPEAK_ATTEMPTS}); it stays queued and will be retried")
+
+    if _pending_ack and mode == "peek":
+        if queue_client.ack(url, token, sorted(_pending_ack)):
+            _pending_ack.clear()
+    elif mode == "legacy":
+        _pending_ack.clear()   # legacy server already deleted everything it returned
     return len(items)
 
 

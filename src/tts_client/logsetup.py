@@ -80,10 +80,20 @@ def log(msg):
         pass
 
 
-def _version_of(dist):
+def _version_of(dist, module=None):
+    # Frozen exes usually don't carry the packages' dist-info, so fall back to
+    # the module's own __version__ (a plain import: edge_tts/requests/aiohttp
+    # are already loaded or loadable by the time the banner is written).
     try:
         from importlib import metadata
         return metadata.version(dist)
+    except Exception:
+        pass
+    try:
+        import importlib
+        mod = importlib.import_module(module or dist.replace("-", "_"))
+        v = getattr(mod, "__version__", None) or getattr(getattr(mod, "version", None), "__version__", None)
+        return str(v) if v else "?"
     except Exception:
         return "?"
 
@@ -108,8 +118,8 @@ def _banner():
     log(f"python={platform.python_version()} os={platform.platform()}")
     log(f"log file: {_path}")
     log(f"ANSI codepage={ansi} stdout.encoding={getattr(sys.stdout, 'encoding', None)}")
-    log(f"edge-tts={_version_of('edge-tts')} requests={_version_of('requests')} "
-        f"aiohttp={_version_of('aiohttp')} pywebview={_version_of('pywebview')}")
+    log(f"edge-tts={_version_of('edge-tts', 'edge_tts')} requests={_version_of('requests')} "
+        f"aiohttp={_version_of('aiohttp')} pywebview={_version_of('pywebview', 'webview')}")
     log(f"local time={datetime.now().isoformat(timespec='seconds')} "
         f"utc={datetime.now(timezone.utc).isoformat(timespec='seconds')}")
 

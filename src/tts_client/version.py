@@ -7,7 +7,7 @@ offered to users via the update button / autoupdate. updater.py compares
 this against the latest GitHub Release's tag_name.
 """
 
-APP_VERSION = "1.1.3"  # vs 1.1.2: always-on log.txt (UTF-8, set up before pywebview), live status line, every poll/speak step logged, timeouts
+APP_VERSION = "1.1.4"  # vs 1.1.3: loss-proof polling (peek/ack with the new Code.gs, redirect-hop retry, 30 s timeouts); falls back to the old drain on an old Code.gs
 
 GITHUB_OWNER = "barel-create"
 GITHUB_REPO = "napominalki-tts"
