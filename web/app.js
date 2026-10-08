@@ -264,9 +264,18 @@ updateBtn.addEventListener("click", async () => {
 // existed. Fix: wait for the 'pywebviewready' event pywebview fires once
 // it's actually available, falling back to running immediately in the
 // rare case that event already fired before this listener was attached.
+async function refreshStatus() {
+  try {
+    const s = await window.pywebview.api.get_status();
+    document.getElementById("app-status").textContent = (s && s.lines ? s.lines : []).join("\n");
+  } catch (e) { /* status line is best-effort */ }
+}
+
 async function init() {
   buildGearTeeth();
   await loadSettings();
+  refreshStatus();
+  setInterval(refreshStatus, 5000);
   await loadDashboard();
   startDashboardRefresh();
   checkForUpdate();

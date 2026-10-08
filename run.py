@@ -11,6 +11,12 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
+# Logging must be set up BEFORE anything else is imported -- pywebview (imported
+# by gui) replaces a missing stdout with devnull and would swallow every error.
+from tts_client import logsetup  # noqa: E402
+
+logsetup.init()
+
 from tts_client.gui import main  # noqa: E402
 
 if __name__ == "__main__":

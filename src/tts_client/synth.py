@@ -31,7 +31,8 @@ def _ffmpeg_path():
 
 async def _synthesize_async(text, voice, out_path):
     communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(out_path)
+    # Hard cap: without it one stalled connection would hang the caller forever.
+    await asyncio.wait_for(communicate.save(out_path), timeout=45)
 
 
 def synthesize(text, voice):

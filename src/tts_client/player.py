@@ -13,6 +13,9 @@ then dropped by request -- Windows only, going forward.)
 import os
 import subprocess
 import sys
+import time
+
+from tts_client.logsetup import log
 
 _PS_SCRIPT = """
 Add-Type -AssemblyName PresentationCore
@@ -35,20 +38,32 @@ $player.Close()
 
 
 def play_file(path, timeout=30):
-    """Blocks until playback finishes (or times out). Returns True on success."""
+    """Blocks until playback finishes (or times out). True only if PowerShell exited 0."""
     if not path or not os.path.exists(path):
+        log(f"[player] file missing, nothing to play: {path}")
         return False
     script = _PS_SCRIPT.format(path=path.replace("\\", "\\\\"))
+    t0 = time.time()
     try:
-        subprocess.run(
+        result = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
             capture_output=True, timeout=timeout,
+            stdin=subprocess.DEVNULL,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-        return True
-    except (OSError, subprocess.SubprocessError) as e:
-        print(f"[player] playback failed for {path}: {e}")
+    except subprocess.TimeoutExpired:
+        log(f"[player] TIMEOUT after {timeout}s playing {os.path.basename(path)}")
         return False
+    except (OSError, subprocess.SubprocessError) as e:
+        log(f"[player] could not start PowerShell for {os.path.basename(path)}: {e!r}")
+        return False
+
+    elapsed = time.time() - t0
+    out = (result.stdout or b"").decode("utf-8", "replace").strip()[:300]
+    err = (result.stderr or b"").decode("utf-8", "replace").strip()[:300]
+    log(f"[player] {os.path.basename(path)} rc={result.returncode} took {elapsed:.1f}s"
+        + (f" stdout={out!r}" if out else "") + (f" stderr={err!r}" if err else ""))
+    return result.returncode == 0
 
 
 def default_chime_path():

@@ -12,59 +12,17 @@ import sys
 import threading
 import time
 import traceback
-from datetime import datetime
 
-import webview
+from tts_client import logsetup
 
-from tts_client import autostart, config, gui_api
+logsetup.init()  # no-op when run.py already did; keeps `python -m tts_client.gui` safe too
+
+import webview  # noqa: E402  (must come AFTER logsetup.init(): pywebview swaps a missing stdout for devnull on import)
+
+from tts_client import autostart, config, gui_api, queue_client, status  # noqa: E402
+from tts_client.logsetup import log  # noqa: E402
 
 WINDOW_TITLE = "Napominalki TTS"
-
-
-# ------------------------------------------------------------------
-# Safe stdout/stderr -- THE ACTUAL CAUSE of "app runs but never speaks".
-#
-# build.spec sets console=False (no black terminal window). On Windows,
-# a PyInstaller --windowed build with no console attached has
-# sys.stdout / sys.stderr set to None. Every print() call in this
-# codebase (speak_item's very first line is print(f"[speak] {text}"))
-# then raises AttributeError: 'NoneType' object has no attribute 'write'.
-# That exception happens inside _poll_loop()'s try block, gets caught,
-# and the except handler ITSELF calls print() to log the error -- which
-# raises the same AttributeError again, uncaught this time, silently
-# killing the whole background polling thread. The window stays open
-# and looks completely normal; the app just never speaks again, from
-# the very first lesson it ever tried to announce, until it's restarted.
-#
-# Fix: redirect stdout/stderr to a log file BEFORE anything else runs,
-# so every existing print()/traceback.print_exc() call site keeps
-# working unchanged, and -- as a bonus -- there's now an actual log.txt
-# to look at if something goes wrong in the future instead of silence.
-# ------------------------------------------------------------------
-
-class _NullWriter:
-    """Last-resort fallback if the log file itself can't be opened (e.g.
-    installed to a read-only location) -- print() still must not crash."""
-    def write(self, _s):
-        pass
-
-    def flush(self):
-        pass
-
-
-def _setup_safe_output(base_dir):
-    if sys.stdout is not None and sys.stderr is not None:
-        return  # real console attached (running from source) -- leave it alone
-
-    try:
-        log_path = os.path.join(base_dir, "log.txt")
-        log_file = open(log_path, "a", encoding="utf-8", buffering=1)
-    except OSError:
-        log_file = _NullWriter()
-
-    sys.stdout = log_file
-    sys.stderr = log_file
-    print(f"\n--- Napominalki TTS starting ({datetime.now().isoformat(timespec='seconds')}) ---")
 
 
 def _web_dir():
@@ -91,27 +49,52 @@ def _index_path():
 # ------------------------------------------------------------------
 
 def _poll_loop():
-    from tts_client.main import poll_once  # local import: avoids main.py's
-                                            # module-level side effects (none
-                                            # today, but keeps gui.py safe if
-                                            # that ever changes) running twice.
     base_dir = config.app_base_dir()
     consecutive_errors = 0
+    polls = 0
+    last_heartbeat = time.time()
+    poll_sec = 5
 
+    try:
+        from tts_client.main import poll_once  # local import: avoids main.py's module-level side effects running twice
+    except Exception:
+        log("[poll] FATAL: could not import poll_once:\n" + traceback.format_exc())
+        status.update(last_error="не удалось запустить опрос (см. log.txt)", last_error_at=time.time())
+        return
+
+    log("[poll] loop started")
     while True:
-        cfg = config.load_config() or {}
-        if not config.is_configured(cfg):
-            time.sleep(2)
-            continue
+        # The WHOLE iteration is guarded (config load included) so nothing can
+        # silently kill this thread.
         try:
-            poll_once(cfg, base_dir)
+            cfg = config._read_raw() or {}  # raw read: load_config() would print a 'missing' line every 2 s while unconfigured
+            poll_sec = cfg.get("poll_sec", 5)
+            if not config.is_configured(cfg):
+                status.update(note="Не заданы URL / токен (Настройки)")
+                time.sleep(2)
+                continue
+            status.update(note=None)
+
+            n = poll_once(cfg, base_dir)
+            polls += 1
+            if consecutive_errors:
+                log(f"[poll] recovered after {consecutive_errors} error(s)")
             consecutive_errors = 0
-        except Exception:
+            status.update(polls=polls, last_poll_at=time.time(), last_poll_ok=True, last_items=n)
+
+            if time.time() - last_heartbeat >= 600:
+                last_heartbeat = time.time()
+                log(f"[poll] alive: {polls} polls so far; last request took "
+                    f"{queue_client.last_info.get('elapsed')}s, clock skew vs server {queue_client.last_info.get('skew')}s")
+        except Exception as e:
             consecutive_errors += 1
-            print(f"[poll] error (#{consecutive_errors}):")
-            traceback.print_exc()
-            time.sleep(min(30, cfg.get("poll_sec", 5) * consecutive_errors))
-        time.sleep(cfg.get("poll_sec", 5))
+            status.update(last_poll_at=time.time(), last_poll_ok=False,
+                          last_error=f"{type(e).__name__}: {e}", last_error_at=time.time())
+            # Log the first few in full, then only every 20th, so a long outage can't fill the disk.
+            if consecutive_errors <= 3 or consecutive_errors % 20 == 0:
+                log(f"[poll] error #{consecutive_errors}:\n{traceback.format_exc()}")
+            time.sleep(min(30, poll_sec * consecutive_errors))
+        time.sleep(poll_sec)
 
 
 # ------------------------------------------------------------------
@@ -147,7 +130,7 @@ def _create_window(frameless, window_holder, api):
             try:
                 win.maximize()
             except Exception as e:
-                print(f"[gui] could not maximize window: {e}")
+                log(f"[gui] could not maximize window: {e}")
         win.events.shown += _maximize_when_shown
 
     window_holder[0] = win
@@ -172,7 +155,7 @@ def _recreate_window(window_holder, api, frameless):
         time.sleep(0.3)  # let the new window actually come up before closing the old one
         old_win.destroy()
     except Exception as e:
-        print(f"[gui] window recreation failed: {e}")
+        log(f"[gui] window recreation failed: {e}")
 
 
 # ------------------------------------------------------------------
@@ -180,7 +163,7 @@ def _recreate_window(window_holder, api, frameless):
 # ------------------------------------------------------------------
 
 def main():
-    _setup_safe_output(config.app_base_dir())
+    logsetup.init()
 
     # Always on, no setting/toggle (by request): every launch (re)registers
     # this exe to start at Windows login. Deliberately does NOT consult
@@ -190,7 +173,7 @@ def main():
     try:
         autostart.install()
     except Exception:
-        traceback.print_exc()
+        log("[autostart] unexpected error:\n" + traceback.format_exc())
 
     cfg = config.get_config_for_gui()
 
@@ -198,10 +181,12 @@ def main():
     api = gui_api.Api(window_holder, on_recreate_window=lambda frameless: _recreate_window(window_holder, api, frameless))
     _create_window(bool(cfg.get("borderless", False)), window_holder, api)
 
-    poll_thread = threading.Thread(target=_poll_loop, daemon=True)
+    poll_thread = threading.Thread(target=_poll_loop, name="poll-loop", daemon=True)
     poll_thread.start()
 
+    log("[gui] window created; entering webview.start()")
     webview.start()
+    log("[gui] webview.start() returned -- window closed, app exiting")
     return 0
 
 

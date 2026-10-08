@@ -7,7 +7,7 @@ offered to users via the update button / autoupdate. updater.py compares
 this against the latest GitHub Release's tag_name.
 """
 
-APP_VERSION = "1.1.2"  # vs 1.1.1: version shown at bottom of Settings; app now self-registers to start at Windows login
+APP_VERSION = "1.1.3"  # vs 1.1.2: always-on log.txt (UTF-8, set up before pywebview), live status line, every poll/speak step logged, timeouts
 
 GITHUB_OWNER = "barel-create"
 GITHUB_REPO = "napominalki-tts"

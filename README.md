@@ -139,3 +139,9 @@ build.spec                  PyInstaller build config (console=False, bundles web
 
 The old PC + Syncthing setup is left running untouched — this is meant to be
 tested side by side before anything gets decommissioned.
+
+
+## Troubleshooting / log (1.1.3)
+
+* `log.txt` is written next to the exe (or in `%LOCALAPPDATA%\NapominalkiTTS\` if that folder is not writable; the first lines of the log say which). It records every start, every poll that returned something, every step of every announcement, and all errors. It is trimmed to 1 MB on each start (the old one is kept as `log.txt.old`).
+* The Settings panel shows a live status line above the version: last poll time/result, last announcement, last error.

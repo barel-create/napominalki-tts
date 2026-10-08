@@ -9,7 +9,8 @@ Kept as a thin wrapper around config.py / synth.py / player.py / updater.py
 
 import threading
 
-from tts_client import config, synth, player, updater
+from tts_client import config, player, status, synth, updater
+from tts_client.logsetup import log
 from tts_client.version import APP_VERSION
 
 VOICE_TEST_PHRASE = "Проверка голоса"
@@ -70,10 +71,18 @@ class Api:
             boosted_path = synth.boost_volume(raw_path, config.DEFAULTS["volume_boost"])
             ok = player.play_file(boosted_path)
             synth.cleanup(raw_path, boosted_path)
+            log(f"[voice-test] voice={voice} ok={ok}")
             return bool(ok)
         except Exception as e:
-            print(f"[gui_api] voice test failed: {e}")
+            log(f"[voice-test] FAILED: {e!r}")
             return False
+
+    # ------------------------------------------------------------
+    # Live status line (polling / last spoken / last error)
+    # ------------------------------------------------------------
+
+    def get_status(self):
+        return {"lines": status.summary_lines()}
 
     # ------------------------------------------------------------
     # Borderless toggle -- applied live. A real OS window's frame style
